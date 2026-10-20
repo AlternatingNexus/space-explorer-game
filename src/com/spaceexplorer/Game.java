@@ -1,5 +1,25 @@
 package com.spaceexplorer;
 
+import com.spaceexplorer.core.GameState;
+import com.spaceexplorer.core.InputHandler;
+import com.spaceexplorer.cryo.CryoRoom;
+import com.spaceexplorer.entity.Player;
+import com.spaceexplorer.hazard.GasLeak;
+import com.spaceexplorer.hazard.GasLeakCountdown;
+import com.spaceexplorer.hazard.Hazard;
+import com.spaceexplorer.interaction.ControlPanel;
+import com.spaceexplorer.interaction.Interactable;
+import com.spaceexplorer.interaction.Inventory;
+import com.spaceexplorer.interaction.Vent;
+import com.spaceexplorer.ui.GamePanel;
+import com.spaceexplorer.ui.Hud;
+import com.spaceexplorer.ui.WorldRenderer;
+import com.spaceexplorer.world.Camera;
+import com.spaceexplorer.world.Light;
+import com.spaceexplorer.world.Lighting;
+import com.spaceexplorer.world.PrototypeLevel;
+import com.spaceexplorer.world.World;
+
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -274,7 +294,7 @@ public final class Game {
         input.endFrame();
     }
 
-    void onMouseClick(int x, int y, int viewWidth, int viewHeight) {
+    public void onMouseClick(int x, int y, int viewWidth, int viewHeight) {
         if (state == GameState.SHIP_DESTROYED
                 && hud.retryButtonBounds(viewWidth, viewHeight).contains(x, y)) {
             retry();
@@ -295,7 +315,7 @@ public final class Game {
 
     /* ---------- rendering ---------- */
 
-    void render(Graphics2D g, int viewWidth, int viewHeight) {
+    public void render(Graphics2D g, int viewWidth, int viewHeight) {
         boolean destroyed = state == GameState.SHIP_DESTROYED;
         hud.setGameOver(destroyed);
 
