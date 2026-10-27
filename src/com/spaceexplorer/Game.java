@@ -2,8 +2,10 @@ package com.spaceexplorer;
 
 import com.spaceexplorer.core.GameState;
 import com.spaceexplorer.core.InputHandler;
+import com.spaceexplorer.core.StoryState;
 import com.spaceexplorer.cryo.CryoRoom;
 import com.spaceexplorer.entity.Player;
+import com.spaceexplorer.entity.Survivor;
 import com.spaceexplorer.hazard.GasLeak;
 import com.spaceexplorer.hazard.GasLeakCountdown;
 import com.spaceexplorer.hazard.Hazard;
@@ -11,6 +13,7 @@ import com.spaceexplorer.interaction.ControlPanel;
 import com.spaceexplorer.interaction.Interactable;
 import com.spaceexplorer.interaction.Inventory;
 import com.spaceexplorer.interaction.Vent;
+import com.spaceexplorer.dialogue.DialogueManager;
 import com.spaceexplorer.ui.GamePanel;
 import com.spaceexplorer.ui.Hud;
 import com.spaceexplorer.ui.WorldRenderer;
@@ -62,6 +65,9 @@ public final class Game {
     private World world;
     private Player player;
     private Inventory inventory;
+    private StoryState storyState;
+    private DialogueManager dialogueManager;
+    private double suppliesSecuredNoticeTimer;
     private Lighting lighting;
     private Light suitLight;
     private WorldRenderer renderer;
@@ -87,7 +93,9 @@ public final class Game {
      * lighting, HUD and countdown, with the progression back at the start.
      */
     private void initRun() {
-        this.world = PrototypeLevel.build();
+        this.storyState = new StoryState();
+        this.world = PrototypeLevel.build(storyState);
+        this.dialogueManager = new DialogueManager();
         this.player = new Player(PrototypeLevel.PLAYER_START_TILE_X, PrototypeLevel.PLAYER_START_TILE_Y);
         this.inventory = new Inventory();
 
@@ -105,12 +113,14 @@ public final class Game {
         this.gasLeak = findGasLeak(world);
         this.gasLeakCountdown = new GasLeakCountdown();
         this.renderer = new WorldRenderer(world, camera);
-        this.hud = new Hud(player, world.getControlPanel(), world, inventory, camera, gasLeakCountdown);
+        this.hud = new Hud(player, world.getControlPanel(), world, inventory, camera, gasLeakCountdown,
+                storyState, dialogueManager);
 
         this.state = GameState.INTRO;
         this.introTimer = INTRO_SECONDS;
         this.elapsedSeconds = 0.0;
         this.failureSeconds = 0.0;
+        this.suppliesSecuredNoticeTimer = 0.0;
         this.lastTickNanos = System.nanoTime();
     }
 
@@ -158,6 +168,22 @@ public final class Game {
         }
 
         elapsedSeconds += dt;
+
+        if (dialogueManager.isOpen()) {
+            dialogueManager.update(dt, input);
+            input.endFrame();
+            return;
+        }
+
+        if (storyState.consumeSuppliesCompletionNotice()) {
+            suppliesSecuredNoticeTimer = 1.8;
+        }
+        if (suppliesSecuredNoticeTimer > 0.0) {
+            suppliesSecuredNoticeTimer -= dt;
+            if (suppliesSecuredNoticeTimer <= 0.0) {
+                player.say("Supplies secured. You're ready for the next stage.", 5.0);
+            }
+        }
 
         if (state == GameState.INTRO) {
             introTimer -= dt;
@@ -218,7 +244,17 @@ public final class Game {
         }
 
         for (Interactable target : world.getInteractables()) {
-            if (target.isInRange(player) && target.interact(player, inventory)) {
+            if (!target.isInRange(player)) {
+                continue;
+            }
+            if (target instanceof Survivor survivor) {
+                if (!dialogueManager.isOpen()) {
+                    dialogueManager.start(survivor.getConversation(),
+                            () -> storyState.learnFuelProblem());
+                }
+                return;
+            }
+            if (target.interact(player, inventory)) {
                 if (target instanceof Vent) {
                     state = advanceState(GameState.VENTILATION_REPAIRED);
                 } else if (target instanceof GasLeak) {

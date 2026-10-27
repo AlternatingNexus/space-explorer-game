@@ -1,6 +1,7 @@
 package com.spaceexplorer.ui;
 
 import com.spaceexplorer.core.Palette;
+import com.spaceexplorer.core.StoryState;
 import com.spaceexplorer.cryo.CryoRoom;
 import com.spaceexplorer.entity.Player;
 import com.spaceexplorer.hazard.GasLeak;
@@ -13,9 +14,12 @@ import com.spaceexplorer.interaction.Vent;
 import com.spaceexplorer.world.Camera;
 import com.spaceexplorer.world.World;
 
+import com.spaceexplorer.dialogue.DialogueManager;
+
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.GradientPaint;
 import java.awt.geom.Ellipse2D;
@@ -23,6 +27,9 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * All 2D user interface: ship power status, the current objective, the
@@ -37,6 +44,8 @@ public class Hud {
     private static final Font FONT_LABEL = new Font(Font.SANS_SERIF, Font.BOLD, 12);
     private static final Font FONT_BIG = new Font(Font.SANS_SERIF, Font.BOLD, 30);
     private static final Font FONT_TITLE = new Font(Font.SANS_SERIF, Font.BOLD, 44);
+    private static final Font FONT_DIALOGUE = new Font(Font.SANS_SERIF, Font.PLAIN, 17);
+    private static final Font FONT_DIALOGUE_SPEAKER = new Font(Font.SANS_SERIF, Font.BOLD, 14);
 
     private static final int RETRY_BUTTON_WIDTH = 220;
     private static final int RETRY_BUTTON_HEIGHT = 56;
@@ -50,6 +59,8 @@ public class Hud {
     private final GasLeak gasLeak;
     private final CryoRoom cryoRoom;
     private final GasLeakCountdown gasLeakCountdown;
+    private final StoryState storyState;
+    private final DialogueManager dialogueManager;
 
     private float introFade = 1.0f;
     private double time;
@@ -57,6 +68,12 @@ public class Hud {
 
     public Hud(Player player, ControlPanel controlPanel, World world, Inventory inventory, Camera camera,
                GasLeakCountdown gasLeakCountdown) {
+        this(player, controlPanel, world, inventory, camera, gasLeakCountdown,
+                new StoryState(), new DialogueManager());
+    }
+
+    public Hud(Player player, ControlPanel controlPanel, World world, Inventory inventory, Camera camera,
+               GasLeakCountdown gasLeakCountdown, StoryState storyState, DialogueManager dialogueManager) {
         this.player = player;
         this.controlPanel = controlPanel;
         this.world = world;
@@ -66,6 +83,8 @@ public class Hud {
         this.gasLeak = findGasLeak(world);
         this.cryoRoom = world.getCryoRoom();
         this.gasLeakCountdown = gasLeakCountdown;
+        this.storyState = storyState == null ? new StoryState() : storyState;
+        this.dialogueManager = dialogueManager == null ? new DialogueManager() : dialogueManager;
     }
 
     /** The objective card needs the vent itself, so it is looked up once here. */
@@ -107,10 +126,16 @@ public class Hud {
         drawPowerStatus(g);
         drawObjectiveCard(g);
         drawGasLeakTimer(g);
+        drawSurvivalMeters(g, viewWidth);
         drawObjectiveMarker(g, viewWidth, viewHeight);
-        drawInteractionPrompt(g, viewWidth, viewHeight);
-        drawPlayerToast(g, viewWidth, viewHeight);
+        if (dialogueManager == null || !dialogueManager.isOpen()) {
+            drawInteractionPrompt(g, viewWidth, viewHeight);
+            drawPlayerToast(g, viewWidth, viewHeight);
+        }
         drawIntro(g, viewWidth, viewHeight);
+        if (dialogueManager != null && dialogueManager.isOpen()) {
+            drawDialogue(g, viewWidth, viewHeight);
+        }
     }
 
     /* ---------- top left status card ---------- */
@@ -166,6 +191,7 @@ public class Hud {
         String line1 = null;
         String line2 = null;
         boolean[] checklist = null;
+        boolean supplyChecklist = false;
 
         if (cryoRoom != null && cryoRoom.isDiscovered()) {
             if (!cryoRoom.isPowered()) {
@@ -178,9 +204,22 @@ public class Hud {
                 line1 = "Cryopods opened: " + cryoRoom.getOpenedCount()
                         + "/" + cryoRoom.getPodCount();
             } else {
-                accent = Palette.LED_ON;
-                objective = "Check on the survivors";
-                line1 = "Two survivors have been awakened";
+                if (!storyState.isFuelProblemLearned()) {
+                    accent = Palette.LED_ON;
+                    objective = "Talk to the survivors.";
+                    line1 = "Two survivors have been awakened";
+                } else if (!storyState.areSuppliesComplete()) {
+                    accent = Palette.ACCENT_BLUE;
+                    objective = "Collect food and water before leaving the ship.";
+                    supplyChecklist = true;
+                    checklist = new boolean[]{storyState.hasFoodSupplies(),
+                            storyState.hasWaterSupplies()};
+                    line2 = "Supplies are stored off the power deck";
+                } else {
+                    accent = Palette.LED_ON;
+                    objective = "Prepare for the trip to the planet.";
+                    line1 = "Supplies secured. You're ready for the next stage.";
+                }
             }
         } else if (contained) {
             accent = Palette.LED_ON;
@@ -226,10 +265,17 @@ public class Hud {
         if (checklist != null) {
             g.setFont(FONT_LABEL);
             int rowY = y + 52;
-            int firstWidth = drawChecklistItem(g, x + 14, rowY,
-                    RepairPartType.PIPE_CLAMP, checklist[0]);
-            drawChecklistItem(g, x + 14 + firstWidth + 18, rowY,
-                    RepairPartType.SEALING_COMPOUND, checklist[1]);
+            if (supplyChecklist) {
+                int firstWidth = drawSupplyChecklistItem(g, x + 14, rowY,
+                        "FOOD SUPPLIES", checklist[0]);
+                drawSupplyChecklistItem(g, x + 14 + firstWidth + 18, rowY,
+                        "WATER SUPPLIES", checklist[1]);
+            } else {
+                int firstWidth = drawChecklistItem(g, x + 14, rowY,
+                        RepairPartType.PIPE_CLAMP, checklist[0]);
+                drawChecklistItem(g, x + 14 + firstWidth + 18, rowY,
+                        RepairPartType.SEALING_COMPOUND, checklist[1]);
+            }
         } else {
             g.setFont(FONT_SMALL);
             g.setColor(Palette.TEXT_DIM);
@@ -255,6 +301,17 @@ public class Hud {
         return g.getFontMetrics().stringWidth("[X] ") + g.getFontMetrics().stringWidth(part.getDisplayName()) + 14;
     }
 
+    /** Checklist row for the food/water supplies. */
+    private int drawSupplyChecklistItem(Graphics2D g, int x, int y,
+                                       String label, boolean owned) {
+        g.setColor(owned ? Palette.LED_ON : Palette.TEXT_DIM);
+        String prefix = label + ": ";
+        g.drawString(prefix, x, y);
+        int prefixWidth = g.getFontMetrics().stringWidth(prefix);
+        g.setColor(owned ? Palette.LED_ON : Palette.TEXT_PRIMARY);
+        g.drawString(owned ? "[X]" : "[ ]", x + prefixWidth, y);
+        return prefixWidth + g.getFontMetrics().stringWidth("[X]") + 18;
+    }
     /**
      * The failure timer, shown under the objective card once the gas leak has
      * become the live objective. It stays hidden before it starts and after a
@@ -342,6 +399,147 @@ public class Hud {
         marker.rotate(angle);
         marker.fill(arrow);
         marker.dispose();
+    }
+
+    /* ---------- survival meters ---------- */
+
+    private void drawSurvivalMeters(Graphics2D g, int viewWidth) {
+        if (storyState == null || !storyState.areSuppliesComplete()) {
+            return;
+        }
+        int cardWidth = 224;
+        int cardHeight = 42;
+        int gap = 8;
+        int x = Math.max(14, viewWidth - cardWidth - 14);
+        int y = 14;
+
+        drawSurvivalMeter(g, x, y, cardWidth, cardHeight, "FOOD",
+                storyState.getFoodPercent(), Palette.LED_ON);
+        drawSurvivalMeter(g, x, y + cardHeight + gap, cardWidth, cardHeight, "WATER",
+                storyState.getWaterPercent(), Palette.ACCENT_BLUE);
+    }
+
+    private void drawSurvivalMeter(Graphics2D g, int x, int y, int cardWidth, int cardHeight,
+                                   String label, int percent, Color accent) {
+        g.setColor(new Color(0, 0, 0, 150));
+        g.fill(new RoundRectangle2D.Double(x, y, cardWidth, cardHeight, 10, 10));
+        g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 120));
+        g.setStroke(new BasicStroke(1.5f));
+        g.draw(new RoundRectangle2D.Double(x, y, cardWidth, cardHeight, 10, 10));
+
+        g.setFont(FONT_LABEL);
+        g.setColor(Palette.TEXT_PRIMARY);
+        g.drawString(label, x + 12, y + 18);
+
+        int barX = x + 66;
+        int barY = y + 24;
+        int barWidth = 118;
+        int barHeight = 8;
+        g.setColor(Palette.METAL_DARK);
+        g.fill(new RoundRectangle2D.Double(barX, barY, barWidth, barHeight, 4, 4));
+        g.setColor(accent);
+        g.fill(new RoundRectangle2D.Double(barX, barY,
+                Math.round(barWidth * percent / 100.0), barHeight, 4, 4));
+
+        g.setFont(FONT_SMALL);
+        g.setColor(accent);
+        String value = percent + "%";
+        g.drawString(value, x + cardWidth - 12 - g.getFontMetrics().stringWidth(value),
+                y + 32);
+    }
+
+    /* ---------- dialogue box ---------- */
+
+    private void drawDialogue(Graphics2D g, int viewWidth, int viewHeight) {
+        if (dialogueManager == null || dialogueManager.getCurrentLine() == null) {
+            return;
+        }
+        int marginX = Math.max(24, viewWidth / 40);
+        int boxHeight = Math.max(108, Math.min(148, Math.round(viewHeight * 0.23f)));
+        int bottomMargin = Math.max(16, viewHeight / 30);
+        int x = marginX;
+        int y = viewHeight - boxHeight - bottomMargin;
+        int width = viewWidth - marginX * 2;
+        int padding = 22;
+
+        g.setColor(new Color(0, 0, 0, 130));
+        g.fill(new RoundRectangle2D.Double(x + 4, y + 4, width, boxHeight, 14, 14));
+        g.setColor(new Color(7, 12, 22, 242));
+        g.fill(new RoundRectangle2D.Double(x, y, width, boxHeight, 14, 14));
+        g.setColor(Palette.ACCENT_BLUE);
+        g.setStroke(new BasicStroke(2f));
+        g.draw(new RoundRectangle2D.Double(x, y, width, boxHeight, 14, 14));
+        g.setColor(new Color(255, 255, 255, 45));
+        g.draw(new RoundRectangle2D.Double(x + 2, y + 2, width - 4, boxHeight - 4, 12, 12));
+
+        g.setFont(FONT_DIALOGUE_SPEAKER);
+        g.setColor(Palette.ACCENT_AMBER);
+        String speaker = dialogueManager.getSpeakerName();
+        g.drawString(speaker, x + padding, y + 28);
+
+        g.setColor(new Color(255, 255, 255, 55));
+        g.drawLine(x + padding, y + 38, x + width - padding, y + 38);
+
+        g.setFont(FONT_DIALOGUE);
+        g.setColor(Palette.TEXT_PRIMARY);
+        String fullText = dialogueManager.getText();
+        List<String> wrapped = wrapDialogueText(g, fullText, width - padding * 2);
+        int revealed = dialogueManager.getRevealedCharacters();
+        int consumed = 0;
+        int lineHeight = 21;
+        int textY = y + 62;
+        for (String wrappedLine : wrapped) {
+            int remaining = revealed - consumed;
+            if (remaining <= 0) {
+                break;
+            }
+            String visible = remaining >= wrappedLine.length()
+                    ? wrappedLine
+                    : wrappedLine.substring(0, Math.max(0, remaining));
+            g.drawString(visible, x + padding, textY);
+            textY += lineHeight;
+            consumed += wrappedLine.length() + 1;
+        }
+
+        String hint = dialogueManager.isLineComplete()
+                ? (dialogueManager.hasNextLine() ? "E / SPACE  NEXT" : "E / SPACE  CLOSE")
+                : "...";
+        g.setFont(FONT_SMALL);
+        g.setColor(Palette.TEXT_DIM);
+        int hintWidth = g.getFontMetrics().stringWidth(hint);
+        g.drawString(hint, x + width - padding - hintWidth, y + boxHeight - 12);
+
+        if (dialogueManager.isLineComplete()) {
+            g.setColor(Palette.ACCENT_AMBER);
+            g.fill(new RoundRectangle2D.Double(x + width - padding - hintWidth - 16,
+                    y + boxHeight - 20, 8, 8, 3, 3));
+        }
+    }
+
+    private static List<String> wrapDialogueText(Graphics2D g, String text, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            return lines;
+        }
+        FontMetrics metrics = g.getFontMetrics();
+        String[] words = text.split(" ");
+        StringBuilder current = new StringBuilder();
+        for (String word : words) {
+            String candidate = current.length() == 0 ? word : current + " " + word;
+            if (metrics.stringWidth(candidate) <= maxWidth || current.length() == 0) {
+                if (current.length() > 0) {
+                    current.append(' ');
+                }
+                current.append(word);
+            } else {
+                lines.add(current.toString());
+                current = new StringBuilder(word);
+            }
+        }
+        if (current.length() > 0) {
+            lines.add(current.toString());
+        }
+        return lines;
     }
 
     /* ---------- interaction prompt ---------- */

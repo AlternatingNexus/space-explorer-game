@@ -38,6 +38,17 @@ public class InputHandler {
         justPressed.clear();
     }
 
+    /**
+     * One-shot advance key for the dialogue box: E, Enter or Space. It uses the
+     * same edge-triggered presses as the interaction key, so a held key can
+     * never skip more than one line.
+     */
+    public boolean isDialogueAdvancePressed() {
+        return wasPressed(KeyEvent.VK_E)
+                || wasPressed(KeyEvent.VK_ENTER)
+                || wasPressed(KeyEvent.VK_SPACE);
+    }
+
     public boolean isLeft() {
         return isDown(KeyEvent.VK_A) || isDown(KeyEvent.VK_LEFT);
     }

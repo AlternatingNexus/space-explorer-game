@@ -1,5 +1,7 @@
 package com.spaceexplorer.world;
 
+import com.spaceexplorer.core.Palette;
+import com.spaceexplorer.core.StoryState;
 import com.spaceexplorer.cryo.CryoLight;
 import com.spaceexplorer.cryo.CryoPowerPanel;
 import com.spaceexplorer.cryo.CryoRoom;
@@ -13,11 +15,16 @@ import com.spaceexplorer.prop.ComputerTerminal;
 import com.spaceexplorer.prop.Crate;
 import com.spaceexplorer.prop.Debris;
 import com.spaceexplorer.prop.FloorGrate;
+import com.spaceexplorer.prop.FloorMarking;
 import com.spaceexplorer.prop.Generator;
 import com.spaceexplorer.prop.Pipe;
 import com.spaceexplorer.prop.ScorchMark;
 import com.spaceexplorer.prop.Shelf;
+import com.spaceexplorer.prop.Shuttle;
 import com.spaceexplorer.prop.Stock;
+import com.spaceexplorer.prop.SupplyContainer;
+import com.spaceexplorer.prop.SupplyStation;
+import com.spaceexplorer.prop.WallLabel;
 import com.spaceexplorer.prop.WallLamp;
 import com.spaceexplorer.prop.WarningBeacon;
 import com.spaceexplorer.prop.WarningSign;
@@ -53,7 +60,7 @@ import com.spaceexplorer.prop.WarningSign;
  */
 public final class PrototypeLevel {
 
-    public static final int WORLD_WIDTH_IN_TILES = 38;
+    public static final int WORLD_WIDTH_IN_TILES = 58;
     public static final int WORLD_HEIGHT_IN_TILES = 41;
 
     public static final int PLAYER_START_TILE_X = 7;
@@ -63,7 +70,12 @@ public final class PrototypeLevel {
         // static factory only
     }
 
+    /** Builds a level with a fresh story state, useful for isolated tests. */
     public static World build() {
+        return build(new StoryState());
+    }
+
+    public static World build(StoryState storyState) {
         ControlPanel controlPanel = new ControlPanel(29, 0, 2, 2);
         World world = new World(WORLD_WIDTH_IN_TILES, WORLD_HEIGHT_IN_TILES, controlPanel);
 
@@ -85,6 +97,14 @@ public final class PrototypeLevel {
         Room cryoSleep = new Room("Cryosleep Bay", 22, 30, 13, 8);
         world.addRoom(cryoSleep);
 
+        // side compartments: supplies off the power deck, hangar off the cryo deck
+        world.addRoom(new Room("Supply Airlock", 37, 7, 1, 2));
+        Room supplyRoom = new Room("Supply Room", 38, 2, 11, 11);
+        world.addRoom(supplyRoom);
+        world.addRoom(new Room("Hangar Airlock", 35, 34, 3, 2));
+        Room shuttleBay = new Room("Shuttle Bay", 38, 27, 15, 13);
+        world.addRoom(shuttleBay);
+
         /* Airlock thresholds between the compartments. */
         world.setDoor(14, 7);
         world.setDoor(14, 8);
@@ -103,6 +123,26 @@ public final class PrototypeLevel {
         world.setDoor(21, 36);
         world.setDoor(22, 36);
 
+        // supply-room airlock: a short side passage east of the power deck
+        world.setDoor(36, 7);
+        world.setDoor(36, 8);
+        world.setDoor(37, 7);
+        world.setDoor(37, 8);
+        world.setDoor(38, 7);
+        world.setDoor(38, 8);
+
+        // hangar airlock: a short side passage east of the cryo deck
+        world.setDoor(34, 34);
+        world.setDoor(34, 35);
+        world.setDoor(35, 34);
+        world.setDoor(35, 35);
+        world.setDoor(36, 34);
+        world.setDoor(36, 35);
+        world.setDoor(37, 34);
+        world.setDoor(37, 35);
+        world.setDoor(38, 34);
+        world.setDoor(38, 35);
+
         world.addProp(controlPanel);
         decorateCrewQuarters(world);
         decorateCorridor(world);
@@ -113,6 +153,8 @@ public final class PrototypeLevel {
 
         CryoRoom cryoRoom = new CryoRoom(world, cryoSleep);
         decorateCryoRoom(world, cryoRoom.getPowerPanel());
+        decorateSupplyRoom(world, storyState);
+        decorateShuttleBay(world);
 
         world.buildWalls();
         return world;
@@ -260,5 +302,61 @@ public final class PrototypeLevel {
         world.addProp(new Crate(23, 32, 1, 1));
         world.addProp(new Cabinet(34, 32, 1, 1, Stock.SUPPLIES));
         world.addProp(new FloorGrate(26, 35, 3, 1));
+    }
+
+    /** The food-and-water stores added for the next stage of the journey. */
+    private static void decorateSupplyRoom(World world, StoryState storyState) {
+        // lamps and compartment marking on the north bulkhead
+        world.addProp(new WallLamp(40, 1, 130, 250));
+        world.addProp(new WallLamp(47, 1, 130, 250));
+        world.addProp(new WallLabel(42, 1, 4, 1, "SUPPLY ROOM", Palette.ACCENT_BLUE));
+        world.addProp(new Pipe(38, 13, 5, 1, true));
+        world.addProp(new Pipe(45, 13, 4, 1, true));
+
+        // storage furniture: shelves above, lockers at the edges, and a small
+        // manifest station between the racks
+        world.addProp(new Shelf(40, 2, 3, 1, Stock.SUPPLIES));
+        world.addProp(new Shelf(45, 2, 2, 1, Stock.SUPPLIES));
+        world.addProp(new SupplyStation(43, 3, 2, 1));
+        world.addProp(new Cabinet(38, 2, 1, 2, Stock.SUPPLIES));
+        world.addProp(new Cabinet(48, 10, 1, 2, Stock.SUPPLIES));
+
+        // the two independently collectable objectives
+        world.addProp(new SupplyContainer(SupplyContainer.SupplyType.FOOD,
+                40, 5, 2, 1, storyState));
+        world.addProp(new SupplyContainer(SupplyContainer.SupplyType.WATER,
+                46, 8, 1, 2, storyState));
+
+        world.addProp(new Crate(39, 10, 1, 1));
+        world.addProp(new Crate(40, 10, 1, 1));
+        world.addProp(new Crate(44, 10, 1, 1));
+        world.addProp(new FloorMarking(42, 7, 4, 2, "SUPPLIES", Palette.ACCENT_AMBER));
+        world.addProp(new FloorGrate(42, 12, 3, 1));
+    }
+
+    /** The hangar and shuttle, deliberately scenery-only for this update. */
+    private static void decorateShuttleBay(World world) {
+        world.addProp(new WallLamp(40, 26, 140, 260));
+        world.addProp(new WallLamp(49, 26, 140, 260));
+        world.addProp(new WallLabel(43, 26, 5, 1, "SHUTTLE BAY", Palette.ACCENT_BLUE));
+        world.addProp(new Pipe(38, 26, 2, 1, true));
+        world.addProp(new Pipe(50, 26, 2, 1, true));
+
+        // maintenance equipment around the bay
+        world.addProp(new Shelf(39, 27, 2, 1, Stock.TOOLS));
+        world.addProp(new ComputerTerminal(39, 29, 1, 1));
+        world.addProp(new Cabinet(50, 28, 1, 2, Stock.TOOLS));
+        world.addProp(new Generator(50, 37, 2, 2));
+        world.addProp(new Crate(39, 38, 1, 1));
+        world.addProp(new Crate(40, 38, 1, 1));
+        world.addProp(new WarningSign(49, 27));
+
+        // the shuttle itself: no interaction, only an open ramp and markings
+        world.addProp(new Shuttle(42, 29, 7, 4));
+        world.addProp(new FloorMarking(43, 27, 4, 1, "DOCK 02", Palette.ACCENT_BLUE));
+        world.addProp(new FloorMarking(40, 34, 3, 1, "FUEL", Palette.HAZARD));
+        world.addProp(new FloorMarking(45, 35, 3, 1, "CARGO", Palette.ACCENT_AMBER));
+        world.addProp(new FloorGrate(42, 38, 3, 1));
+        world.addProp(new ScorchMark(49, 34, 2, 1));
     }
 }

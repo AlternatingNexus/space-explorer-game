@@ -1,5 +1,9 @@
 package com.spaceexplorer.entity;
 
+import com.spaceexplorer.dialogue.DialogueConversation;
+import com.spaceexplorer.dialogue.DialogueLine;
+import com.spaceexplorer.interaction.Interactable;
+import com.spaceexplorer.interaction.Inventory;
 import com.spaceexplorer.world.Prop;
 
 import java.awt.Color;
@@ -20,7 +24,7 @@ import java.awt.geom.RoundRectangle2D;
  * added next to the pod. Once released they stay there, so leaving and
  * returning always shows the same awakened crew members.</p>
  */
-public final class Survivor extends Prop {
+public final class Survivor extends Prop implements Interactable {
 
     private static final int FIGURE_WIDTH = 20;
     private static final int FIGURE_HEIGHT = 20;
@@ -33,11 +37,18 @@ public final class Survivor extends Prop {
     private final Color hair;
     private final Color boots;
 
+    private static final double INTERACT_RANGE = 96.0;
+
+    private final String displayName;
+    private final DialogueConversation conversation;
+
     private double time;
 
     public Survivor(int tileX, int tileY, int variant) {
         super(tileX, tileY, 1, 1, Layer.OBJECT);
         this.variant = variant;
+        this.displayName = variant == 1 ? "CREW MEMBER 1" : "CREW MEMBER 2";
+        this.conversation = createConversation(variant);
         if (variant == 1) {
             // engineer: teal coveralls with amber trim, dark hair
             this.uniform = new Color(0x2C7A8C);
@@ -62,6 +73,72 @@ public final class Survivor extends Prop {
         return variant;
     }
 
+    /** Name shown by the HUD prompt and the dialogue box. */
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    /** The conversation this survivor speaks when talked to. */
+    public DialogueConversation getConversation() {
+        return conversation;
+    }
+
+    /* ---------- Interactable ---------- */
+
+    @Override
+    public boolean isInRange(Player player) {
+        double dx = player.getCenterX() - getCenterX();
+        double dy = player.getCenterY() - getCenterY();
+        return Math.sqrt(dx * dx + dy * dy) <= INTERACT_RANGE;
+    }
+
+    @Override
+    public boolean isActionReady(Player player, Inventory inventory) {
+        return true;
+    }
+
+    @Override
+    public String getStatusText(Player player, Inventory inventory) {
+        return displayName;
+    }
+
+    @Override
+    public String getActionPrompt(Player player, Inventory inventory) {
+        return "Press E to talk";
+    }
+
+    @Override
+    public boolean interact(Player player, Inventory inventory) {
+        // Game owns the conversation so it can coordinate the dialogue manager.
+        // The boolean only reports that the survivor is a valid interaction
+        // target; the conversation itself is started by Game.
+        return true;
+    }
+
+    private static DialogueConversation createConversation(int variant) {
+        if (variant == 1) {
+            return DialogueConversation.of(
+                    new DialogueLine("CREW MEMBER 1",
+                            "You're awake too, huh? I was starting to think we'd never get those pods open."),
+                    new DialogueLine("CREW MEMBER 1",
+                            "The ship's fuel reserves are almost depleted. We won't get far at this rate."),
+                    new DialogueLine("CREW MEMBER 1",
+                            "There's a planet just below us. We're holding position above its atmosphere, but we can't stay here forever."),
+                    new DialogueLine("CREW MEMBER 1",
+                            "There's a shuttle aboard. If we can reach the surface and find fuel, we might have a chance."),
+                    new DialogueLine("CREW MEMBER 1",
+                            "Before you leave, grab some food and water from the supply room. We need enough to survive the trip."));
+        }
+        return DialogueConversation.of(
+                new DialogueLine("CREW MEMBER 2",
+                        "I checked the ship's fuel readings. They're worse than I'd hoped."),
+                new DialogueLine("CREW MEMBER 2",
+                        "The planet beneath us is our best option. The main ship doesn't have enough fuel to get us anywhere else."),
+                new DialogueLine("CREW MEMBER 2",
+                        "There's a shuttle we can use, but don't leave without supplies."),
+                new DialogueLine("CREW MEMBER 2",
+                        "Find the food and water stores first. We have no idea how long you'll be down there."));
+    }
     @Override
     public boolean blocksMovement() {
         return false;
