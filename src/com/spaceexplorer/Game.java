@@ -249,8 +249,12 @@ public final class Game {
             }
             if (target instanceof Survivor survivor) {
                 if (!dialogueManager.isOpen()) {
-                    dialogueManager.start(survivor.getConversation(),
-                            () -> storyState.learnFuelProblem());
+                    dialogueManager.start(survivor.getConversation(), () -> {
+                        storyState.learnFuelProblem();
+                        if (storyState.acquireSupplyRoomKey()) {
+                            player.say("Supply Room Key acquired.", 4.0);
+                        }
+                    });
                 }
                 return;
             }

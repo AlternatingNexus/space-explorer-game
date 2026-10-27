@@ -12,6 +12,8 @@ import java.awt.Graphics2D;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.RoundRectangle2D;
 
+import java.util.function.BooleanSupplier;
+
 /**
  * The small inventory console in the Supply Room. It is purely decorative: the
  * individual containers are the interactive objects.
@@ -22,14 +24,27 @@ public final class SupplyStation extends Prop {
     private static final Font SCREEN_FONT = new Font(Font.MONOSPACED, Font.BOLD, 8);
 
     private final Light screenLight;
+    private final BooleanSupplier activeCondition;
 
     public SupplyStation(int tileX, int tileY, int tileW, int tileH) {
+        this(tileX, tileY, tileW, tileH, null);
+    }
+
+    public SupplyStation(int tileX, int tileY, int tileW, int tileH, BooleanSupplier activeCondition) {
         super(tileX, tileY, tileW, tileH, Layer.OBJECT);
+        this.activeCondition = activeCondition;
         this.screenLight = new Light(getCenterX(), getCenterY(),
                 55.0, 115.0,
                 Palette.ACCENT_AMBER,
                 Palette.ACCENT_BLUE,
                 0.35);
+    }
+
+    @Override
+    public void update(double dt) {
+        if (activeCondition != null) {
+            screenLight.setActive(activeCondition.getAsBoolean());
+        }
     }
 
     @Override
@@ -39,6 +54,9 @@ public final class SupplyStation extends Prop {
 
     @Override
     public void draw(Graphics2D g) {
+        if (activeCondition != null && !activeCondition.getAsBoolean()) {
+            return;
+        }
         g.setColor(new Color(0, 0, 0, 75));
         g.fill(new Ellipse2D.Double(x + 3, y + height - 6, width - 5, 8));
 

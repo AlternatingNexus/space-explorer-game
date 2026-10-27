@@ -145,11 +145,14 @@ public final class SupplyContainer extends Prop implements Interactable {
     @Override
     public void update(double dt) {
         time += dt;
-        supplyLight.setActive(!isCollected());
+        supplyLight.setActive(storyState.isSupplyRoomUnlocked() && !isCollected());
     }
 
     @Override
     public void draw(Graphics2D g) {
+        if (!storyState.isSupplyRoomUnlocked()) {
+            return;
+        }
         if (type == SupplyType.FOOD) {
             drawFoodContainer(g);
         } else {

@@ -9,6 +9,8 @@ import java.awt.Graphics2D;
 import java.awt.RadialGradientPaint;
 import java.awt.geom.Ellipse2D;
 
+import java.util.function.BooleanSupplier;
+
 /**
  * A bulkhead lamp. It is the ship lighting itself: dim red on emergency power,
  * cool white once the console has been activated. It also contributes its own
@@ -17,14 +19,28 @@ import java.awt.geom.Ellipse2D;
 public final class WallLamp extends Prop {
 
     private final Light lampLight;
+    private final BooleanSupplier activeCondition;
 
     public WallLamp(int tileX, int tileY, double emergencyRadius, double poweredRadius) {
+        this(tileX, tileY, emergencyRadius, poweredRadius, null);
+    }
+
+    public WallLamp(int tileX, int tileY, double emergencyRadius, double poweredRadius,
+                    BooleanSupplier activeCondition) {
         super(tileX, tileY, 1, 1, Layer.OBJECT);
         this.lampLight = new Light(getCenterX(), getCenterY(),
                 emergencyRadius, poweredRadius,
                 Palette.LED_EMERGENCY,
                 new Color(0xD8ECFF),
                 0.85);
+        this.activeCondition = activeCondition;
+    }
+
+    @Override
+    public void update(double dt) {
+        if (activeCondition != null) {
+            lampLight.setActive(activeCondition.getAsBoolean());
+        }
     }
 
     @Override
@@ -39,7 +55,7 @@ public final class WallLamp extends Prop {
 
     @Override
     public void draw(Graphics2D g) {
-        Color glow = lampLight.getColor();
+        Color glow = lampLight.isActive() ? lampLight.getColor() : Palette.METAL_DARK;
 
         // bloom
         float radius = 30f;

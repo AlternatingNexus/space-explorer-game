@@ -19,11 +19,38 @@ public final class StoryState {
     private boolean waterSuppliesCollected;
     private boolean suppliesCompletionPending;
 
+    private boolean supplyRoomKey;
+    private boolean supplyRoomUnlocked;
+
     private int foodPercent = FULL_SUPPLIES;
     private int waterPercent = FULL_SUPPLIES;
 
     public boolean isFuelProblemLearned() {
         return fuelProblemLearned;
+    }
+
+    public boolean hasSupplyRoomKey() {
+        return supplyRoomKey;
+    }
+
+    /** Grants the key once. Returns true only on the first successful grant. */
+    public boolean acquireSupplyRoomKey() {
+        if (supplyRoomKey) {
+            return false;
+        }
+        supplyRoomKey = true;
+        return true;
+    }
+
+    public boolean isSupplyRoomUnlocked() {
+        return supplyRoomUnlocked;
+    }
+
+    /** Unlocks the Supply Room door. The key must already have been acquired. */
+    public void unlockSupplyRoom() {
+        if (supplyRoomKey) {
+            supplyRoomUnlocked = true;
+        }
     }
 
     /** Records that a survivor has explained the fuel situation. */

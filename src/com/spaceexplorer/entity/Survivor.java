@@ -119,15 +119,15 @@ public final class Survivor extends Prop implements Interactable {
         if (variant == 1) {
             return DialogueConversation.of(
                     new DialogueLine("CREW MEMBER 1",
-                            "You're awake too, huh? I was starting to think we'd never get those pods open."),
-                    new DialogueLine("CREW MEMBER 1",
                             "The ship's fuel reserves are almost depleted. We won't get far at this rate."),
                     new DialogueLine("CREW MEMBER 1",
                             "There's a planet just below us. We're holding position above its atmosphere, but we can't stay here forever."),
                     new DialogueLine("CREW MEMBER 1",
                             "There's a shuttle aboard. If we can reach the surface and find fuel, we might have a chance."),
                     new DialogueLine("CREW MEMBER 1",
-                            "Before you leave, grab some food and water from the supply room. We need enough to survive the trip."));
+                            "Before you leave, we'll need food and water for the trip."),
+                    new DialogueLine("CREW MEMBER 1",
+                            "The supply room is locked. Here, take this key. The supplies inside should be enough to get us started."));
         }
         return DialogueConversation.of(
                 new DialogueLine("CREW MEMBER 2",
@@ -137,7 +137,9 @@ public final class Survivor extends Prop implements Interactable {
                 new DialogueLine("CREW MEMBER 2",
                         "There's a shuttle we can use, but don't leave without supplies."),
                 new DialogueLine("CREW MEMBER 2",
-                        "Find the food and water stores first. We have no idea how long you'll be down there."));
+                        "The supply room is locked, so you won't get far without its key."),
+                new DialogueLine("CREW MEMBER 2",
+                        "Take this. It should open the supply room. Get the food and water before we leave."));
     }
     @Override
     public boolean blocksMovement() {

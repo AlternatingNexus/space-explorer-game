@@ -123,6 +123,8 @@ public class Hud {
             return;
         }
 
+        drawLockedSupplyRoomDarkness(g, viewWidth, viewHeight);
+
         drawPowerStatus(g);
         drawObjectiveCard(g);
         drawGasLeakTimer(g);
@@ -540,6 +542,49 @@ public class Hud {
             lines.add(current.toString());
         }
         return lines;
+    }
+
+    /* ---------- locked supply room darkness ---------- */
+
+    /**
+     * Keeps the Supply Room unreadable while it is locked, even after the main
+     * ship lights have been restored. The overlay is drawn after the world and
+     * lighting, but before the HUD elements, so it never covers prompts, meters
+     * or dialogue.
+     */
+    private void drawLockedSupplyRoomDarkness(Graphics2D g, int viewWidth, int viewHeight) {
+        if (storyState == null || storyState.isSupplyRoomUnlocked()) {
+            return;
+        }
+
+        int roomX = 38 * World.TILE_SIZE;
+        int roomY = 2 * World.TILE_SIZE;
+        int roomWidth = 11 * World.TILE_SIZE;
+        int roomHeight = 11 * World.TILE_SIZE;
+
+        int screenX = (int) Math.round(camera.toScreenX(roomX));
+        int screenY = (int) Math.round(camera.toScreenY(roomY));
+        int screenWidth = (int) Math.round(roomWidth * 1.0);
+        int screenHeight = (int) Math.round(roomHeight * 1.0);
+
+        // Clamp to the viewport so the overlay stays well behaved at the edges.
+        int left = Math.max(0, screenX);
+        int top = Math.max(0, screenY);
+        int right = Math.min(viewWidth, screenX + screenWidth);
+        int bottom = Math.min(viewHeight, screenY + screenHeight);
+        if (right <= left || bottom <= top) {
+            return;
+        }
+
+        // Use a high but non-opaque alpha so the room's walls and floor still
+        // read as a faint silhouette rather than disappearing entirely.
+        g.setColor(new Color(6, 10, 22, 210));
+        g.fillRect(left, top, right - left, bottom - top);
+
+        // A slightly lighter inner edge hints that the room continues beyond
+        // the doorway without revealing any of its contents.
+        g.setColor(new Color(255, 255, 255, 18));
+        g.drawRect(left, top, right - left - 1, bottom - top - 1);
     }
 
     /* ---------- interaction prompt ---------- */

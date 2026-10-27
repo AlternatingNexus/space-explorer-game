@@ -23,6 +23,7 @@ import com.spaceexplorer.prop.Shelf;
 import com.spaceexplorer.prop.Shuttle;
 import com.spaceexplorer.prop.Stock;
 import com.spaceexplorer.prop.SupplyContainer;
+import com.spaceexplorer.prop.SupplyRoomDoor;
 import com.spaceexplorer.prop.SupplyStation;
 import com.spaceexplorer.prop.WallLabel;
 import com.spaceexplorer.prop.WallLamp;
@@ -155,6 +156,9 @@ public final class PrototypeLevel {
         decorateCryoRoom(world, cryoRoom.getPowerPanel());
         decorateSupplyRoom(world, storyState);
         decorateShuttleBay(world);
+
+        // The Supply Room stays locked until a survivor gives the player its key.
+        world.addProp(new SupplyRoomDoor(37, 7, 1, 2, storyState));
 
         world.buildWalls();
         return world;
@@ -307,8 +311,8 @@ public final class PrototypeLevel {
     /** The food-and-water stores added for the next stage of the journey. */
     private static void decorateSupplyRoom(World world, StoryState storyState) {
         // lamps and compartment marking on the north bulkhead
-        world.addProp(new WallLamp(40, 1, 130, 250));
-        world.addProp(new WallLamp(47, 1, 130, 250));
+        world.addProp(new WallLamp(40, 1, 130, 250, () -> storyState.isSupplyRoomUnlocked()));
+        world.addProp(new WallLamp(47, 1, 130, 250, () -> storyState.isSupplyRoomUnlocked()));
         world.addProp(new WallLabel(42, 1, 4, 1, "SUPPLY ROOM", Palette.ACCENT_BLUE));
         world.addProp(new Pipe(38, 13, 5, 1, true));
         world.addProp(new Pipe(45, 13, 4, 1, true));
@@ -317,7 +321,7 @@ public final class PrototypeLevel {
         // manifest station between the racks
         world.addProp(new Shelf(40, 2, 3, 1, Stock.SUPPLIES));
         world.addProp(new Shelf(45, 2, 2, 1, Stock.SUPPLIES));
-        world.addProp(new SupplyStation(43, 3, 2, 1));
+        world.addProp(new SupplyStation(43, 3, 2, 1, () -> storyState.isSupplyRoomUnlocked()));
         world.addProp(new Cabinet(38, 2, 1, 2, Stock.SUPPLIES));
         world.addProp(new Cabinet(48, 10, 1, 2, Stock.SUPPLIES));
 
@@ -330,7 +334,6 @@ public final class PrototypeLevel {
         world.addProp(new Crate(39, 10, 1, 1));
         world.addProp(new Crate(40, 10, 1, 1));
         world.addProp(new Crate(44, 10, 1, 1));
-        world.addProp(new FloorMarking(42, 7, 4, 2, "SUPPLIES", Palette.ACCENT_AMBER));
         world.addProp(new FloorGrate(42, 12, 3, 1));
     }
 
