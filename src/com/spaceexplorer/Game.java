@@ -15,6 +15,9 @@ import com.spaceexplorer.interaction.Interactable;
 import com.spaceexplorer.interaction.Inventory;
 import com.spaceexplorer.interaction.Vent;
 import com.spaceexplorer.dialogue.DialogueManager;
+import com.spaceexplorer.enemy.EnemyManager;
+import com.spaceexplorer.enemy.EnemyRadar;
+import com.spaceexplorer.enemy.EnemyRenderer;
 import com.spaceexplorer.planet.PlanetWorld;
 import com.spaceexplorer.planet.PlanetRenderer;
 import com.spaceexplorer.ui.GamePanel;
@@ -82,6 +85,9 @@ public final class Game {
     private WorldMode worldMode = WorldMode.SHIP;
     private PlanetWorld planetWorld;
     private PlanetRenderer planetRenderer;
+    private EnemyManager enemyManager;
+    private EnemyRadar enemyRadar;
+    private EnemyRenderer enemyRenderer;
     private boolean transitioningToPlanet;
     private TransitionPhase transitionPhase;
     private double transitionTimer;
@@ -128,6 +134,9 @@ public final class Game {
     private void initRun() {
         this.planetWorld = null;
         this.planetRenderer = null;
+        this.enemyManager = null;
+        this.enemyRadar = null;
+        this.enemyRenderer = null;
         this.storyState = new StoryState();
         this.world = PrototypeLevel.build(storyState);
         this.dialogueManager = new DialogueManager();
@@ -165,6 +174,10 @@ public final class Game {
             }
             this.player = new Player(0, 0);
             this.camera.centerOn(player.getCenterX(), player.getCenterY());
+            this.enemyManager = new EnemyManager(0x5EED1234L);
+            this.enemyManager.spawnInitial(this.player);
+            this.enemyRadar = new EnemyRadar();
+            this.enemyRenderer = new EnemyRenderer(this.enemyManager);
             this.transitioningToPlanet = false;
         }
         this.transitioningToPlanet = false;
@@ -238,6 +251,10 @@ public final class Game {
                 }
                 player = new Player(0, 0);
                 camera.centerOn(player.getCenterX(), player.getCenterY());
+                enemyManager = new EnemyManager(0x5EED1234L);
+                enemyManager.spawnInitial(player);
+                enemyRadar = new EnemyRadar();
+                enemyRenderer = new EnemyRenderer(enemyManager);
             } else if (transitionPhase == TransitionPhase.BLACK && transitionTimer >= 2.0) {
                 transitionPhase = TransitionPhase.FADE_IN;
                 transitionTimer = 0.0;
@@ -252,8 +269,14 @@ public final class Game {
             if (planetWorld != null) {
                 planetWorld.update(dt, player);
             }
+            if (enemyManager != null) {
+                enemyManager.update(dt, player, planetWorld);
+            }
             player.update(dt, input, planetWorld);
             camera.centerOn(player.getCenterX(), player.getCenterY());
+            if (enemyRadar != null) {
+                enemyRadar.update(dt, player, enemyManager);
+            }
             input.endFrame();
             return;
         }
@@ -469,6 +492,12 @@ public final class Game {
 
         if (worldMode == WorldMode.PLANET && planetRenderer != null) {
             planetRenderer.render(g, player, camera);
+            if (enemyRenderer != null) {
+                enemyRenderer.render(g, camera);
+            }
+            if (!transitioningToPlanet && enemyRadar != null) {
+                enemyRadar.draw(g, viewWidth, viewHeight);
+            }
         } else {
             renderer.render(g, player, lighting, hud, elapsedSeconds);
             if (destroyed) {
