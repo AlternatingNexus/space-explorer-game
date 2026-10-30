@@ -44,6 +44,12 @@ public class Camera {
         clamp(world);
     }
 
+    /** Centers the camera without clamping, used by unbounded streaming worlds. */
+    public void centerOn(double worldX, double worldY) {
+        x = worldX - viewWidth / 2.0;
+        y = worldY - viewHeight / 2.0;
+    }
+
     private void clamp(World world) {
         double maxX = world.getPixelWidth() - viewWidth;
         double maxY = world.getPixelHeight() - viewHeight;

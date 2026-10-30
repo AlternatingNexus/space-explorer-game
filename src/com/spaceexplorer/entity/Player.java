@@ -3,6 +3,7 @@ package com.spaceexplorer.entity;
 import com.spaceexplorer.core.InputHandler;
 import com.spaceexplorer.core.Palette;
 import com.spaceexplorer.world.World;
+import com.spaceexplorer.world.WorldLike;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -40,7 +41,7 @@ public class Player {
 
     /* ---------- movement ---------- */
 
-    public void update(double dt, InputHandler input, World world) {
+    public void update(double dt, InputHandler input, WorldLike world) {
         double dx = 0.0;
         double dy = 0.0;
         if (input.isLeft()) {
@@ -80,7 +81,7 @@ public class Player {
         }
     }
 
-    private void move(double deltaX, double deltaY, World world) {
+    private void move(double deltaX, double deltaY, WorldLike world) {
         if (deltaX == 0.0 && deltaY == 0.0) {
             return;
         }

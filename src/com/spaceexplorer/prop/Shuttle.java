@@ -1,6 +1,9 @@
 package com.spaceexplorer.prop;
 
 import com.spaceexplorer.core.Palette;
+import com.spaceexplorer.entity.Player;
+import com.spaceexplorer.interaction.Interactable;
+import com.spaceexplorer.interaction.Inventory;
 import com.spaceexplorer.world.Prop;
 
 import java.awt.BasicStroke;
@@ -18,7 +21,7 @@ import java.awt.geom.RoundRectangle2D;
  * be entered or launched. The open rear ramp is drawn so the hangar reads as a
  * future departure point without promising a mechanic that does not exist yet.</p>
  */
-public final class Shuttle extends Prop {
+public final class Shuttle extends Prop implements Interactable {
 
     private static final Font LABEL_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 10);
     private static final Font SMALL_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 8);
@@ -29,9 +32,40 @@ public final class Shuttle extends Prop {
         super(tileX, tileY, tileW, tileH, Layer.OBJECT);
     }
 
+    private static final double INTERACT_RANGE = 120.0;
+
     @Override
     public void update(double dt) {
         time += dt;
+    }
+
+    /* ---------- Interactable ---------- */
+
+    @Override
+    public boolean isInRange(Player player) {
+        double dx = player.getCenterX() - getCenterX();
+        double dy = player.getCenterY() - getCenterY();
+        return Math.sqrt(dx * dx + dy * dy) <= INTERACT_RANGE;
+    }
+
+    @Override
+    public boolean isActionReady(Player player, Inventory inventory) {
+        return true;
+    }
+
+    @Override
+    public String getStatusText(Player player, Inventory inventory) {
+        return "SHUTTLE";
+    }
+
+    @Override
+    public String getActionPrompt(Player player, Inventory inventory) {
+        return "Press E to enter shuttle";
+    }
+
+    @Override
+    public boolean interact(Player player, Inventory inventory) {
+        return true;
     }
 
     @Override

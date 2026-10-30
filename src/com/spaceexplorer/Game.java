@@ -6,6 +6,7 @@ import com.spaceexplorer.core.StoryState;
 import com.spaceexplorer.cryo.CryoRoom;
 import com.spaceexplorer.entity.Player;
 import com.spaceexplorer.entity.Survivor;
+import com.spaceexplorer.prop.Shuttle;
 import com.spaceexplorer.hazard.GasLeak;
 import com.spaceexplorer.hazard.GasLeakCountdown;
 import com.spaceexplorer.hazard.Hazard;
@@ -14,6 +15,8 @@ import com.spaceexplorer.interaction.Interactable;
 import com.spaceexplorer.interaction.Inventory;
 import com.spaceexplorer.interaction.Vent;
 import com.spaceexplorer.dialogue.DialogueManager;
+import com.spaceexplorer.planet.PlanetWorld;
+import com.spaceexplorer.planet.PlanetRenderer;
 import com.spaceexplorer.ui.GamePanel;
 import com.spaceexplorer.ui.Hud;
 import com.spaceexplorer.ui.WorldRenderer;
@@ -73,6 +76,15 @@ public final class Game {
     private WorldRenderer renderer;
     private Hud hud;
     private GasLeak gasLeak;
+
+    private enum WorldMode { SHIP, PLANET }
+    private enum TransitionPhase { FADE_OUT, BLACK, FADE_IN }
+    private WorldMode worldMode = WorldMode.SHIP;
+    private PlanetWorld planetWorld;
+    private PlanetRenderer planetRenderer;
+    private boolean transitioningToPlanet;
+    private TransitionPhase transitionPhase;
+    private double transitionTimer;
     private GasLeakCountdown gasLeakCountdown;
 
     private GameState state;
@@ -81,10 +93,31 @@ public final class Game {
     private double failureSeconds;
     private long lastTickNanos;
 
+    private final boolean startInPlanetMode;
+    private final java.awt.Font loadingFont;
+
     public Game() {
+        this(false);
+    }
+
+    public Game(boolean startInPlanetMode) {
+        this.startInPlanetMode = startInPlanetMode;
+        this.loadingFont = loadLoadingFont();
         initRun();
         this.panel = new GamePanel(this, input);
         this.timer = new Timer(TIMER_INTERVAL_MS, event -> tick());
+    }
+
+    private static java.awt.Font loadLoadingFont() {
+        try (java.io.InputStream stream = Game.class.getResourceAsStream("/com/spaceexplorer/resources/Orbitron.ttf")) {
+            if (stream != null) {
+                java.awt.Font font = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, stream);
+                return font.deriveFont(java.awt.Font.BOLD, 30f);
+            }
+        } catch (Exception ignored) {
+            // Fall through to the bundled-independent fallback below.
+        }
+        return new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.BOLD, 30);
     }
 
     /**
@@ -93,6 +126,8 @@ public final class Game {
      * lighting, HUD and countdown, with the progression back at the start.
      */
     private void initRun() {
+        this.planetWorld = null;
+        this.planetRenderer = null;
         this.storyState = new StoryState();
         this.world = PrototypeLevel.build(storyState);
         this.dialogueManager = new DialogueManager();
@@ -121,6 +156,20 @@ public final class Game {
         this.elapsedSeconds = 0.0;
         this.failureSeconds = 0.0;
         this.suppliesSecuredNoticeTimer = 0.0;
+        this.worldMode = WorldMode.SHIP;
+        if (startInPlanetMode) {
+            this.worldMode = WorldMode.PLANET;
+            if (this.planetWorld == null) {
+                this.planetWorld = new PlanetWorld(0x5EED1234L);
+                this.planetRenderer = new PlanetRenderer(this.planetWorld, camera);
+            }
+            this.player = new Player(0, 0);
+            this.camera.centerOn(player.getCenterX(), player.getCenterY());
+            this.transitioningToPlanet = false;
+        }
+        this.transitioningToPlanet = false;
+        this.transitionPhase = TransitionPhase.FADE_OUT;
+        this.transitionTimer = 0.0;
         this.lastTickNanos = System.nanoTime();
     }
 
@@ -135,7 +184,15 @@ public final class Game {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new Game().start());
+        boolean planetMode = Boolean.getBoolean("eryx9")
+                || Boolean.getBoolean("spaceexplorer.eryx9");
+        for (String arg : args) {
+            if (arg.equalsIgnoreCase("--eryx9")) {
+                planetMode = true;
+            }
+        }
+        boolean finalPlanetMode = planetMode;
+        SwingUtilities.invokeLater(() -> new Game(finalPlanetMode).start());
     }
 
     private void start() {
@@ -168,6 +225,38 @@ public final class Game {
         }
 
         elapsedSeconds += dt;
+
+        if (transitioningToPlanet) {
+            transitionTimer += dt;
+            if (transitionPhase == TransitionPhase.FADE_OUT && transitionTimer >= 0.7) {
+                transitionPhase = TransitionPhase.BLACK;
+                transitionTimer = 0.0;
+                worldMode = WorldMode.PLANET;
+                if (planetWorld == null) {
+                    planetWorld = new PlanetWorld(0x5EED1234L);
+                    planetRenderer = new PlanetRenderer(planetWorld, camera);
+                }
+                player = new Player(0, 0);
+                camera.centerOn(player.getCenterX(), player.getCenterY());
+            } else if (transitionPhase == TransitionPhase.BLACK && transitionTimer >= 2.0) {
+                transitionPhase = TransitionPhase.FADE_IN;
+                transitionTimer = 0.0;
+            } else if (transitionPhase == TransitionPhase.FADE_IN && transitionTimer >= 0.7) {
+                transitioningToPlanet = false;
+            }
+            input.endFrame();
+            return;
+        }
+
+        if (worldMode == WorldMode.PLANET) {
+            if (planetWorld != null) {
+                planetWorld.update(dt, player);
+            }
+            player.update(dt, input, planetWorld);
+            camera.centerOn(player.getCenterX(), player.getCenterY());
+            input.endFrame();
+            return;
+        }
 
         if (dialogueManager.isOpen()) {
             dialogueManager.update(dt, input);
@@ -247,6 +336,10 @@ public final class Game {
             if (!target.isInRange(player)) {
                 continue;
             }
+            if (target instanceof Shuttle) {
+                startPlanetTransition();
+                return;
+            }
             if (target instanceof Survivor survivor) {
                 if (!dialogueManager.isOpen()) {
                     dialogueManager.start(survivor.getConversation(), () -> {
@@ -323,6 +416,19 @@ public final class Game {
         failureSeconds = 0.0;
     }
 
+    private void startPlanetTransition() {
+        if (transitioningToPlanet || worldMode != WorldMode.SHIP) {
+            return;
+        }
+        transitioningToPlanet = true;
+        transitionPhase = TransitionPhase.FADE_OUT;
+        transitionTimer = 0.0;
+        if (planetWorld == null) {
+            planetWorld = new PlanetWorld(0x5EED1234L);
+            planetRenderer = new PlanetRenderer(planetWorld, camera);
+        }
+    }
+
     /* ---------- retry ---------- */
 
     /**
@@ -360,10 +466,43 @@ public final class Game {
         hud.setGameOver(destroyed);
 
         camera.setViewportSize(viewWidth, viewHeight);
-        renderer.render(g, player, lighting, hud, elapsedSeconds);
 
-        if (destroyed) {
-            hud.drawFailure(g, viewWidth, viewHeight, failureSeconds);
+        if (worldMode == WorldMode.PLANET && planetRenderer != null) {
+            planetRenderer.render(g, player, camera);
+        } else {
+            renderer.render(g, player, lighting, hud, elapsedSeconds);
+            if (destroyed) {
+                hud.drawFailure(g, viewWidth, viewHeight, failureSeconds);
+            }
+        }
+
+        if (transitioningToPlanet) {
+            float alpha;
+            if (transitionPhase == TransitionPhase.FADE_OUT) {
+                alpha = (float) Math.min(1.0, transitionTimer / 0.7);
+            } else if (transitionPhase == TransitionPhase.BLACK) {
+                alpha = 1.0f;
+            } else {
+                alpha = (float) Math.max(0.0, 1.0 - transitionTimer / 0.7);
+            }
+            g.setColor(new Color(0, 0, 0, Math.round(255 * alpha)));
+            g.fillRect(0, 0, viewWidth, viewHeight);
+
+            if (transitionPhase == TransitionPhase.BLACK || alpha > 0.92f) {
+                g.setFont(loadingFont);
+                g.setColor(new Color(220, 225, 235, Math.round(255 * Math.min(1.0f, alpha))));
+                String text = "TRAVELLING TO ERYX-9";
+                java.awt.FontMetrics metrics = g.getFontMetrics();
+                int spacing = 4;
+                int totalWidth = metrics.stringWidth(text) + spacing * (text.length() - 1);
+                int textX = (viewWidth - totalWidth) / 2;
+                int textY = viewHeight / 2 + 24;
+                for (int i = 0; i < text.length(); i++) {
+                    String character = String.valueOf(text.charAt(i));
+                    g.drawString(character, textX, textY);
+                    textX += metrics.charWidth(text.charAt(i)) + spacing;
+                }
+            }
         }
     }
 

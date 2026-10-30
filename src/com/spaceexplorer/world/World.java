@@ -18,7 +18,7 @@ import java.util.List;
  * that are placed next to each other simply share an open edge, corridors and
  * doorways connect themselves without any special case.</p>
  */
-public class World {
+public class World implements WorldLike {
 
     public static final int TILE_SIZE = 32;
 
